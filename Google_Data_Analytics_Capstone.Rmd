@@ -1,0 +1,289 @@
+---
+title: "Google Data Analytics Capstone"
+author: "Tony Xie"
+date: "25/04/2022"
+output:
+  html_document: default
+  pdf_document: default
+always_allow_html: yes
+---
+
+# Google Data Analytics Capstone
+## Cyclistic Bike-share Analysis Case Study
+### Introduction
+
+The Cyclistic Bike-share Analysis Case Study has been selected as the capstone project for the Google Data Analytics Professional Certificate Program. This case study involves analyzing the dataset provided by the fictional company named Cyclistic following the steps of the data analysis process (ask, prepare, process, analyze, share and act) to develop a new marketing strategy for the company.
+
+### Ask
+
+The business task of Cyclistic is to maximize the number of annual memberships by converting casual riders into annual member. The data analysis goal is to gain understanding of the differences between annual members and casual riders, the reason why casual riders would decide to purchase annual membership and how digital media could influence their marketing strategies. 
+
+### Prepare
+
+The dataset consist of bike ride data from April 2021 to March 2022. The raw data is stored in csv format which includes details of each ride such as start time, end time, start station name, end station name, start location coordinates, end location coordinates and membership type.
+
+Load R packages required for analysis.
+```{r packages}
+# Install packages
+library(tidyverse) # collection of R packages for data science
+library(lubridate) # package to work with date-time
+library(janitor) # package for cleaning data
+library(ggplot2) # package to create data visualizations
+
+```
+
+Import bike ride raw datasets from April 2021 to March 2022.
+```{r import}
+m04_2021 <- read.csv('202104-divvy-tripdata.csv')
+m05_2021 <- read.csv('202105-divvy-tripdata.csv')
+m06_2021 <- read.csv('202106-divvy-tripdata.csv')
+m07_2021 <- read.csv('202107-divvy-tripdata.csv')
+m08_2021 <- read.csv('202108-divvy-tripdata.csv')
+m09_2021 <- read.csv('202109-divvy-tripdata.csv')
+m10_2021 <- read.csv('202110-divvy-tripdata.csv')
+m11_2021 <- read.csv('202111-divvy-tripdata.csv')
+m12_2021 <- read.csv('202112-divvy-tripdata.csv')
+m01_2022 <- read.csv('202201-divvy-tripdata.csv')
+m02_2022 <- read.csv('202202-divvy-tripdata.csv')
+m03_2022 <- read.csv('202203-divvy-tripdata.csv')
+```
+Examine the column name of the April 2021 bike ride dataset.
+```{r column name of the April 2021 dataset}
+colnames(m04_2021)
+```
+
+Check if column names are consistent across all files.
+```{r column names check}
+colnames(m04_2021) == colnames(m05_2021)
+colnames(m05_2021) == colnames(m06_2021)
+colnames(m06_2021) == colnames(m07_2021)
+colnames(m07_2021) == colnames(m08_2021)
+colnames(m08_2021) == colnames(m09_2021)
+colnames(m09_2021) == colnames(m10_2021)
+colnames(m10_2021) == colnames(m11_2021)
+colnames(m11_2021) == colnames(m12_2021)
+colnames(m12_2021) == colnames(m01_2022)
+colnames(m01_2022) == colnames(m02_2022)
+colnames(m02_2022) == colnames(m03_2022)
+```
+
+Combine data from each month into one data frame.
+```{r combine}
+bike_trips <- rbind(m04_2021, m05_2021, m06_2021, m07_2021, m08_2021, m09_2021, m10_2021, m11_2021, m12_2021, m01_2022, m02_2022, m03_2022)
+```
+
+Preview combined data frame.
+```{r preview}
+head(bike_trips)
+```
+
+Check internal structure of the combined data frame.
+```{r structure}
+str(bike_trips)
+```
+
+### Process
+
+Although the datasets have been combined into one data frame, it needs to be cleaned for analysis. The columns "started_at" and "ended_at" are not in the right format and therefore need to be converted from character to date-time.
+```{r character to date-time conversion}
+bike_trips$started_at <- as.POSIXct(bike_trips$started_at, format = "%Y-%m-%d %H:%M:%S", tz = "America/Chicago")
+bike_trips$ended_at <- as.POSIXct(bike_trips$ended_at, format = "%Y-%m-%d %H:%M:%S",  tz = "America/Chicago")
+```
+
+Preview the combined data frame after the character to date-time conversion.
+```{r preview after date-time conversion}
+head(bike_trips)
+```
+
+Split "started_at" column into different columns for ease of analysis.
+```{r separate}
+bike_trips$year <- format(as.Date(bike_trips$started_at), "%Y")
+bike_trips$month <- format(as.Date(bike_trips$started_at), "%m")
+bike_trips$day <- format(as.Date(bike_trips$started_at), "%d")
+bike_trips$day_of_week <- format(as.Date(bike_trips$started_at), "%A")
+bike_trips$hour <- hour(bike_trips$started_at)
+bike_trips$minute <- minute(bike_trips$started_at)
+bike_trips$date <- as.Date(bike_trips$started_at)
+```
+
+Preview data frame again to ensure that the new date and time columns have been added.
+```{r preview date and time}
+head(bike_trips)
+```
+
+Add a new column to for the bike ride duration by calculating the difference between the "started_at" and "ended_at".
+```{r ride duration}
+bike_trips$duration_hour <- as.numeric(difftime(bike_trips$ended_at, bike_trips$started_at, units = "hours"))
+bike_trips$duration_minute <- as.numeric(difftime(bike_trips$ended_at, bike_trips$started_at, units = "mins"))
+```
+
+Preview data frame again to ensure that the duration column has been added.
+```{r preview with duration}
+head(bike_trips)
+```
+Check the dimension of the data frame.
+```{r dimension}
+dim(bike_trips)
+```
+
+Check the summary of the data frame.
+```{r summary}
+summary(bike_trips)
+```
+
+
+Check if there are any negative duration values in the data frame.
+```{r check negative duration}
+nrow(bike_trips[bike_trips$duration_hour < 0,]) # negative duration counts
+```
+
+Preview rows with negative duration.
+```{r preview rows with negative duration}
+head(bike_trips[bike_trips$duration_hour < 0,])
+```
+
+Remove rows with negative duration values.
+```{r remove rows with negative duration}
+bike_trips <- bike_trips[bike_trips$duration_hour >= 0,]
+```
+
+Check dimension of the data frame again after removing rows with negative duration values.
+```{r check dimension after negative duration rows removal}
+dim(bike_trips)
+```
+
+Check the summary of data frame again after removing negative duration values.
+```{r summary after removing negative duration values}
+summary(bike_trips)
+```
+
+Determine the number of NA values in the data frame.
+```{r Count NA}
+sum(is.na(bike_trips))
+```
+
+Calculate the percentage of NA values in the data frame.
+```{r percentage of NA values}
+sum(is.na(bike_trips))/(nrow(bike_trips)*ncol(bike_trips))*100
+```
+
+Since only a small percentage of the data frame contains NA values, rows with NA values are removed from the data frame.
+```{r drop NA}
+bike_trips <- bike_trips[complete.cases(bike_trips),]
+```
+
+Check to ensure all NA values have been removed.
+```{r check NA after removal}
+sum(is.na(bike_trips))
+```
+
+
+Check the dimension of data frame after removing rows with NA values.
+```{r check dimension after removing rows with NA values}
+dim(bike_trips)
+```
+
+Check summary of data frame after removing rows with NA values.
+```{r summary after removing rows with NA values}
+summary(bike_trips)
+```
+
+Label month with proper names and put month and day of week in the right order.
+```{r order}
+bike_trips$month_name <- factor(bike_trips$month, levels = c("04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02", "03"), labels = c("April 2021", "May 2021", "June 2021", "July 2021", "August 2021", "September 2021", "October 2021", "November 2021", "December 2021", "January 2022", "February 2022", "March 2022"))
+
+bike_trips$day_of_week <- factor(bike_trips$day_of_week, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+```
+
+
+Preview data frame after data cleaning.
+```{r preview after data cleaning}
+head(bike_trips)
+```
+
+### Analyze
+
+Since the data cleaning process has been completed, the cleaned data frame will be analyzed to determine the differences between annual members and casual riders.
+
+Here are the basic statistics of the ride duration. 
+```{r bike trip duration stats}
+cat("The average amount of time spent in a bike trip is", mean(bike_trips$duration_minute), " minutes.\n")
+cat("The median amount of time spent in a bike trip is ", median(bike_trips$duration_minute), " minutes.\n")
+cat("The minimum amount of time spent in a bike trip is ", min(bike_trips$duration_minute), " minutes.\n")
+cat("The maximum amount of time spent in a bike trip is ", max(bike_trips$duration_minute), " minutes.\n")
+cat("The standard deviation of the amount of time spent in a bike trip is ", sd(bike_trips$duration_minute), " minutes.")
+```
+The results show that the bike rider spends around 20.5 minutes in average per trip. However, there is a large difference between the maximum and minimum value. In addition, the amount of variation is substantial as shown by the standard deviation.
+
+Here is the comparison between the average amount of time spent by casual riders and annual members. 
+```{r general aggregation}
+setNames(aggregate(bike_trips$duration_minute ~ bike_trips$member_casual, FUN = mean), c("Casual Rider or Annual Member", "Trip Duration (Minute)"))
+```
+The casual riders spends more than twice amount of time than the annual members.
+
+Here is the average amount of time spent by casual riders and annual members grouped by month. 
+```{r aggregation by month}
+aggregate(bike_trips$duration_minute ~ bike_trips$member_casual + bike_trips$month_name, FUN = mean)
+```
+Note that the bike ride duration for annual members are more consistent across each month; whereas, more variability is observed with casual riders. Both the casual riders and annual members spent more time on bike rides from April to July 2021.
+
+Here is the average amount of time spent by casual riders and annual members grouped by day of week. 
+```{r aggregate by weekday}
+aggregate(bike_trips$duration_minute ~ bike_trips$member_casual + bike_trips$day_of_week, FUN = mean)
+```
+The bike ride duration for annual members are more consistent, especially in the weekdays. Casual riders spend more time using bike ride service on Saturday, Sunday and Monday.
+
+### Share
+
+Visualizations are developed to further identify patterns and trends between casual bike riders and annual members.
+
+Here is the number of bike rides by month for casual riders and annual members.
+```{r monthly bike ride chart}
+ggplot(bike_trips, aes(x = month_name, group = member_casual, fill = member_casual)) + geom_bar(position = "dodge") + labs(x = "Month", y = "Number of Rides", title = "Bike Rides per Month", fill = "Type") + theme(axis.text.x = element_text(angle = 90), plot.title = element_text(hjust = 0.5))
+```
+This chart shows that there are considerably more bike rides in the summer months than the winter month. Although there are less number of rides in the winter months for both members and non-members (casual riders), the number of bike rides for non-members diminishes much more significantly, indicating that annual members are more likely to utilize Cyclistic's bike riding service than non-members in the winter months.
+
+Here is the number of bike rides by day of week for casual riders and annual members.
+```{r day of week bike ride chart}
+ggplot(bike_trips, aes(x = day_of_week, group = member_casual, fill = member_casual)) + geom_bar(position = "dodge") + labs(x = "Day of Week", y = "Number of Rides", title = "Bike Rides per Day of Week", fill = "Type") + theme(axis.text.x = element_text(angle = 90), plot.title = element_text(hjust = 0.5))
+```
+This chart shows that annual members uses the bike rides services more consistently than the non-members on a day-to-day basis. The number of bike rides for non-members is substantially higher on the weekends, whereas the number of bike rides for annual members are similar across each day of the week. This results could imply that the annual members mainly uses Cyclistic's bike riding service for daily commute and the non-members mainly uses it for leisure activities.
+
+Here is the duration of bike rides by month for casual riders and annual members.
+```{r monthly duration chart}
+ggplot(bike_trips, aes(x = month_name, y = duration_minute, fill = member_casual)) + stat_summary(geom = "bar", position = "dodge", fun.y = "mean") + labs(x = "Month", y = "Bike Ride Duration (Minute)", title = "Average Bike Ride Duration per month", fill = "Type") + theme(axis.text.x = element_text(angle = 90), plot.title = element_text(hjust = 0.5))
+```
+This chart shows that the average time spent on bike riding for annual members is fairly consistent over each month; however, non-members spent much more time using Cyclistic's bike riding service in the summer months compare to the winter months. 
+
+Here is the duration of bike rides by day of week for casual riders and annual members.
+```{r day of week duration chart}
+ggplot(bike_trips, aes(x = day_of_week, y = duration_minute, fill = member_casual)) + stat_summary(geom = "bar", position = "dodge", fun.y = "mean") + labs(x = "Day of Week", y = "Bike Ride Duration (Minute)", title = "Average Bike Ride Duration per Day of Week", fill = "Type") + theme(axis.text.x = element_text(angle = 90), plot.title = element_text(hjust = 0.5))
+```
+This chart shows that the average bike ride duration for annual members is fairly consistent over each day of week with slight increase on the weekends; whereas, the average bike ride duration for non-members are relatively higher on Saturday, Sunday and Monday. 
+
+Here are the maps that mark the start and end locations of the annual members and non-members using a sampled dataset.
+```{r map}
+library(mapview)
+library(leafsync)
+bike_trips_sample <- {set.seed(1); bike_trips[sample(nrow(bike_trips), 100), ]} # randomly sample 100 data points
+bike_trips_sample_casual <- subset(bike_trips_sample, member_casual == "casual")
+bike_trips_sample_member <- subset(bike_trips_sample, member_casual == "member")
+map_start <- mapview(bike_trips_sample_casual, xcol = "start_lng", ycol = "start_lat", crs = 4326, color = "chartreuse3", col.regions = "chartreuse3", grid = FALSE, layer.name = "non-member origin") + mapview(bike_trips_sample_member, xcol = "start_lng", ycol = "start_lat", crs = 4326, color = "dodgerblue3", col.regions = "dodgerblue3", grid = FALSE, layer.name = "member origin")
+map_end <- mapview(bike_trips_sample_casual, xcol = "end_lng", ycol = "end_lat", crs = 4326, color = "chartreuse3", col.regions = "chartreuse3", grid = FALSE, layer.name = "non-member destination") + mapview(bike_trips_sample_member, xcol = "end_lng", ycol = "end_lat", crs = 4326, color = "dodgerblue3", col.regions = "dodgerblue3", grid = FALSE, layer.name = "member destination")
+
+sync(map_start, map_end)
+```
+These maps indicate that most of the rides started and ended in the city center area; however, the start and end locations for annual members are more scattered than the start and end locations the non-members.
+
+### Act
+#### Summary
+1. Annual members use the bike ride service more consistently than non-members throughout each week. Non-members use the bike ride service more frequently on the weekends.
+2. Although both members' and non-members' bike usage follows a seasonal trend, non-members use the bike ride service more frequently than annual members in the summer months and less frequently in the winter months.
+3. On average, non-members spend around twice amount time than the annual members per bike ride.
+4. The majority of the bike rides started and ended in the city center area; however, annual members' start and end locations are more scattered than the start and end locations of the non-members.
+
+#### Recommendations
+1. Provide discount or coupons to members who use the service over a set amount of hours per trip to attract more membership purchases.
+2. Run more advertisements of Cyclistic's annual membership during the weekends of summer months to gain more recognition from casual riders.
+3. Focus promoting Cyclistic's annual membership in the city center area.
